@@ -12,7 +12,7 @@ Adb工具
 
 工具开发起来很简单，在.Net里面使用Process类来执行CMD命令即可。
 
-需要注意的是在使用adb命令的时候经常需要针对结果进行过滤，比如linux里面grep,windows是使用findstr。
+需要注意的是在使用adb命令的时候经常需要针对结果进行过滤，比如linux里面grep,windows是使用findstr。如果是进入了adb shell里面后执行的命令都是linux命令了。
 
 
 ### 运行截图
