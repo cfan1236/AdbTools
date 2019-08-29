@@ -9,8 +9,14 @@ namespace AdbTools.Helper
 {
     public class AdbHelper
     {
-
+        /// <summary>
+        /// and目录
+        /// </summary>
         private string adbDir = "";
+        /// <summary>
+        /// android版本 
+        /// </summary>
+        private float androidVer = 0;
         public AdbHelper(string adbDir)
         {
             this.adbDir = adbDir;
@@ -22,7 +28,6 @@ namespace AdbTools.Helper
         public bool CheckAdb()
         {
             var str = ExecCmd(new List<string>() { "adb" });
-
             if (str.Contains("不是内部或外部命令") || str.Contains("is not recognized as an internal or external command"))
                 return false;
             return true;
@@ -85,12 +90,44 @@ namespace AdbTools.Helper
         }
 
         /// <summary>
+        /// 获取android版本
+        /// </summary>
+        /// <returns></returns>
+        public float GetAndroidVersion()
+        {
+            if (androidVer == 0)
+            {
+                var ver = 0f;
+                List<string> connectCmds = new List<string>()
+                {
+                 $"adb shell getprop ro.build.version.release",
+
+                };
+                var str = ExecCmd(connectCmds, false);
+                //提取版本信息
+                var matchs = Regex.Matches(str, @"[^\n]*");
+                if (matchs.Count >= 9)
+                {
+                    str = matchs[8].Value.Replace("\r", "");
+                }
+                //取第一个字符转换成数字 例如8.1.0 转换成8
+                float.TryParse(str[0].ToString(), out ver);
+                androidVer = ver;
+            }
+            return androidVer;
+        }
+
+        /// <summary>
         /// 获取进程信息
         /// </summary>
         public Dictionary<int, string> GetProcessInfo(string searchStr = "")
         {
-
+            //android 8.1版本ps命令需要加"-A"参数 才能获取完整进程信息。
             string cmds = "adb shell ps";
+            if (GetAndroidVersion() >= 8)
+            {
+                cmds = "adb shell ps -A";
+            }
             if (!string.IsNullOrEmpty(searchStr))
             {
                 cmds += " |findstr " + searchStr;
@@ -102,11 +139,17 @@ namespace AdbTools.Helper
             (sender, e) =>
              {
                  var data = e.Data;
+                 Console.WriteLine("data:" + e.Data);
                  if (!string.IsNullOrWhiteSpace(data))
                  {
-
+                     //过滤cmd执行相关信息
+                     if (e.Data.Contains("Microsoft") || e.Data.Contains("adb shell"))
+                     {
+                         return;
+                     }
                      //过滤掉非进程信息和root用户的进程信息(root代表系统进程)
-                     if (data.Contains("ffffffff") && !data.Contains("root"))
+                     // "0"进程中包含的信息 不同字段都有包含 以此来确定当前行信息是进程信息
+                     if (data.Contains("0") && !data.Contains("root"))
                      {
                          //提取pid
                          var pid = 0;
@@ -118,7 +161,6 @@ namespace AdbTools.Helper
                              pid = int.Parse(number[1]);
                          }
                          //提取进程名称
-                         Console.WriteLine("data:" + e.Data);
                          var pName = data.Substring(data.LastIndexOf("S") + 1).Trim();
                          Console.WriteLine("pid:" + pid + " pName:" + pName);
                          if (!result.ContainsKey(pid))
@@ -176,7 +218,7 @@ namespace AdbTools.Helper
                 return false;
             }
         }
-       
+
         /// <summary>
         /// 截图
         /// </summary>
@@ -202,16 +244,20 @@ namespace AdbTools.Helper
             return "";
         }
 
+
         /// <summary>
-        /// 执行cmd命令
+        /// 移除空格
         /// </summary>
         /// <param name="cmds"></param>
+        /// <param name="rm_space"></param>
         /// <returns></returns>
-        private string ExecCmd(List<string> cmds)
+        private string ExecCmd(List<string> cmds, bool rm_space = true)
         {
             var result = "";
             cmds = GetCmds(cmds);
-            result = CmdHelper.ExecCmd(cmds).Replace(" ", "").Replace("\r", "").Replace("\n", "");
+            result = CmdHelper.ExecCmd(cmds);
+            if (rm_space)
+                result = result.Replace(" ", "").Replace("\r", "").Replace("\n", "");
             return result;
         }
 
