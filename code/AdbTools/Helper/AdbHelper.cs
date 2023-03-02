@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -39,23 +40,28 @@ namespace AdbTools.Helper
             {
                  $"adb connect {ip}",
                  "adb devices"
-
             };
 
             var str = ExecCmd(connectCmds);
-            if (ip.Contains("5555"))
+            //str已经去掉了空格
+
+            //代表连接失败
+            if (str.Contains("unabletoconnect"))
+                return flag;
+
+            if (str.Contains($"connectedto{ip}"))
             {
                 if (str.Contains($"{ip}	device"))
                 {
                     flag = true;
                 }
-            }
-            else
-            {
-                //连接成功
-                if (str.Contains($"{ip}:5555	device"))
+                //ip不包含端口 判断是否有使用默认端口5555
+                else if (!ip.Contains(":") && str.Contains("5555"))
                 {
-                    flag = true;
+                    if (str.Contains($"{ip}:5555 device"))
+                    {
+                        flag = true;
+                    }
                 }
             }
 
@@ -191,12 +197,18 @@ namespace AdbTools.Helper
         public bool InstallApk(string fileName, out string errMsg)
         {
             errMsg = "";
-            List<string> connectCmds = new List<string>()
-            {
-                  $"adb install -r \""+fileName+"\"",
 
-            };
-            var resultStr = ExecCmd(connectCmds);
+            //检查连接
+            var resultStr = ExecCmd(new List<string> { "adb devices" });
+            resultStr = resultStr.Replace("adbdevicesListofdevicesattached", "");
+            if (!resultStr.Contains("device"))
+            {
+                errMsg = "devicenotfound";
+                return false;
+
+            }
+
+            resultStr = ExecCmd(new List<string> { $"adb install -r \"" + fileName + "\"" });
             if (resultStr.Contains("Success"))
             {
                 return true;
